@@ -1,10 +1,12 @@
 """Файл моделей."""
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.db import models
 
 from blog.constants import CHARACTER_RESTRICTION, MAX_NAME_LENG
 from blog.managers import PostManager
+
 
 User = get_user_model()
 

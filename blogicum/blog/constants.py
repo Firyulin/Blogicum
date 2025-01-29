@@ -1,5 +1,7 @@
 """Файл для констант."""
+
 from django.core.paginator import Paginator
+
 
 MAX_NAME_LENG = 256
 CHARACTER_RESTRICTION = 10

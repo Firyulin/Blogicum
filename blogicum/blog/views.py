@@ -1,14 +1,15 @@
 """Views функции blogicum."""
-import datetime as dt
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from blog.constants import get_paginator
 from blog.forms import CommentForm, PostForm, UserForm
 from blog.models import Category, Comment, Post
+
 
 User = get_user_model()
 
@@ -63,7 +64,7 @@ def post_detail(
                 'location',
                 'author'
             ).filter(
-                pub_date__lt=dt.datetime.now(),
+                pub_date__lte=timezone.now(),
                 category__is_published=True,
                 is_published=True,
                 id=post_id
@@ -207,7 +208,6 @@ def edit_post(
         )
     form = PostForm(
         request.POST or None,
-        files=request.FILES or None,
         instance=post
     )
     if form.is_valid():
@@ -247,7 +247,6 @@ def edit_comment(
         )
     form = CommentForm(
         request.POST or None,
-        files=request.FILES or None,
         instance=comment
     )
     if form.is_valid():
