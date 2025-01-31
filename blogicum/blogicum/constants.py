@@ -1,0 +1,5 @@
+"""Файл констант."""
+
+MAX_NAME_LENG = 256
+CHARACTER_RESTRICTION = 10
+COUNT_POSTS = 10

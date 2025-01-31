@@ -1,10 +1,9 @@
 from django import forms
+
 from blog.models import Comment, Post, User
 
 
-class UserForm(
-    forms.ModelForm
-):
+class UserForm(forms.ModelForm):
     class Meta:
         model = User
         fields = (
@@ -15,9 +14,7 @@ class UserForm(
         )
 
 
-class CommentForm(
-    forms.ModelForm
-):
+class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = (
@@ -25,9 +22,7 @@ class CommentForm(
         )
 
 
-class PostForm(
-    forms.ModelForm
-):
+class PostForm(forms.ModelForm):
     class Meta:
         model = Post
         exclude = (

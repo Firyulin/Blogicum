@@ -1,7 +1,5 @@
 """Пути проекта."""
 
-from django.conf import settings
-from django.conf.urls.static import static
 from django.urls import path
 
 from blog import views
@@ -65,7 +63,4 @@ urlpatterns = [
         views.delete_comment,
         name='delete_comment'
     ),
-] + static(
-    settings.MEDIA_URL,
-    document_root=settings.MEDIA_ROOT
-)
+]

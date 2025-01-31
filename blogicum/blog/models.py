@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.db import models
 
-from blog.constants import CHARACTER_RESTRICTION, MAX_NAME_LENG
 from blog.managers import PostManager
+from blogicum.constants import CHARACTER_RESTRICTION, MAX_NAME_LENG
 
 
 User = get_user_model()
@@ -102,15 +102,21 @@ class Post(BaseModel):
         verbose_name='Категория',
         related_name='posts'
     )
+    image = models.ImageField(
+        'Фото',
+        upload_to='blogicum_images',
+        blank=True
+    )
+
     objects = models.Manager()
     published_posts = PostManager()
-    image = models.ImageField('Фото', upload_to='blogicum_images', blank=True)
 
     class Meta(BaseModel.Meta):
         """Абстрактная модель."""
 
         verbose_name = 'Публикация'
         verbose_name_plural = 'Публикации'
+        ordering = ('-pub_date',)
 
     def __str__(self):
         """Магический метод дял админки."""

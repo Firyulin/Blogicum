@@ -3,52 +3,54 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from blog.constants import get_paginator
 from blog.forms import CommentForm, PostForm, UserForm
 from blog.models import Category, Comment, Post
+from blogicum.utils import get_paginator
 
 
 User = get_user_model()
 
 
-def index(
-        request
-):
+def index(request):
     """View функция главной страницы blogicum."""
-    post_list = Post.published_posts.select_related(
-        'author',
-        'location',
-        'category'
-    ).order_by(
-        '-pub_date'
-    ).annotate(
-        comment_count=Count(
-            'comments'
-        )
-    )
-    context = {
-        'post_list': post_list
-    }
-    context.update(
-        get_paginator(
-            request,
-            post_list
-        )
-    )
     return render(
         request,
         'blog/index.html',
-        context
+        {
+            'post_list': Post.published_posts.select_related(
+                'author',
+                'location',
+                'category'
+            ).order_by(
+                '-pub_date'
+            ).annotate(
+                comment_count=Count(
+                    'comments'
+                )
+            ),
+            'page_obj': get_paginator(
+                request,
+                Post.published_posts.select_related(
+                    'author',
+                    'location',
+                    'category'
+                ).order_by(
+                    '-pub_date'
+                ).annotate(
+                    comment_count=Count(
+                        'comments'
+                    )
+                )
+            )
+        }
     )
 
 
-def post_detail(
-        request,
-        post_id
-):
+def post_detail(request, post_id):
     """View функция подробной страницы."""
     post = get_object_or_404(
         Post.objects.select_related(
@@ -57,64 +59,50 @@ def post_detail(
             'author'
         ), id=post_id
     )
-    if post.author != request.user:
-        post = get_object_or_404(
-            Post.objects.select_related(
-                'category',
-                'location',
-                'author'
-            ).filter(
-                pub_date__lte=timezone.now(),
-                category__is_published=True,
-                is_published=True,
-                id=post_id
-            )
-        )
+    if post.author != request.user and not (post.pub_date <= timezone.now()
+                                            and post.category.is_published
+                                            and post.is_published):
+        raise Http404('Пост не найден/доступен')
     return render(
         request,
         'blog/detail.html',
         {
             'post': post,
             'form': CommentForm(),
-            'comments': Comment.objects.all().filter(
-                post_id=post_id
+            'comments': post.comments.filter(post_id=post_id)
+        }
+    )
+
+
+def category_posts(request, category_slug):
+    """View функция категорий."""
+    return render(
+        request,
+        'blog/category.html',
+        {
+            'category': get_object_or_404(
+                Category.objects.filter(
+                    slug=category_slug
+                ),
+                is_published=True,
+            ),
+            'page_obj': get_paginator(
+                request,
+                get_object_or_404(
+                    Category.objects.filter(
+                        slug=category_slug
+                    ),
+                    is_published=True
+                ).posts(
+                    manager='published_posts'
+                ).all()
             )
         }
     )
 
 
-def category_posts(request,
-                   category_slug
-                   ):
-    """View функция категорий."""
-    category = get_object_or_404(
-        Category.objects.filter(
-            slug=category_slug
-        ), is_published=True,
-    )
-    posts = category.posts(
-        manager='published_posts'
-    ).all()
-    context = {
-        'category': category
-    }
-    context.update(
-        get_paginator(
-            request,
-            posts
-        )
-    )
-    return render(
-        request,
-        'blog/category.html',
-        context
-    )
-
-
 @login_required
-def create_post(
-    request
-):
+def create_post(request):
     form = PostForm(
         request.POST or None,
         files=request.FILES or None
@@ -138,41 +126,43 @@ def create_post(
     )
 
 
-def profile(
-        request,
-        username
-):
+def profile(request, username):
     profile = get_object_or_404(
         User,
         username=username
     )
-    posts = Post.objects.filter(
-        author=profile
+    posts = Post.objects.select_related(
+        'category',
+        'location',
+        'author'
+    ).filter(author=profile).annotate(
+        comment_count=Count(
+            'comments'
+        )
     ).order_by(
         '-pub_date'
-    ).annotate(
-        comment_count=Count('comments')
     )
-    context = {
-        'profile': profile
-    }
-    context.update(
-        get_paginator(
-            request,
-            posts
+    if profile.id != request.user.id:
+        posts = posts.filter(
+            pub_date__lte=timezone.now(),
+            category__is_published=True,
+            is_published=True
         )
-    )
     return render(
         request,
         'blog/profile.html',
-        context,
+        {
+            'profile': profile,
+            'page_obj': get_paginator(
+                request,
+                posts
+            )
+        }
     )
 
 
 @login_required
-def edit_profile(
-        request
-):
+def edit_profile(request):
     instance = get_object_or_404(
         User,
         username=request.user
@@ -193,10 +183,7 @@ def edit_profile(
 
 
 @login_required
-def edit_post(
-    request,
-    post_id
-):
+def edit_post(request, post_id):
     post = get_object_or_404(
         Post,
         id=post_id
@@ -228,19 +215,12 @@ def edit_post(
 
 
 @login_required
-def edit_comment(
-        request,
-        post_id,
-        comment_id
-):
+def edit_comment(request, post_id, comment_id):
     comment = get_object_or_404(
         Comment,
         id=comment_id
     )
-    user = Comment.objects.get(
-        pk=comment_id
-    )
-    if request.user != user.author:
+    if request.user != Comment.objects.get(pk=comment_id).author:
         return redirect(
             'blog:post_detail',
             post_id
@@ -267,28 +247,14 @@ def edit_comment(
 
 
 @login_required
-def delete_post(
-    request,
-    post_id
-):
-    post = get_object_or_404(
-        Post,
-        id=post_id
-    )
-    instance = get_object_or_404(
-        Post,
-        id=post_id
-    )
-    form = PostForm(
-        instance=instance
-    )
-    if request.user != post.author:
+def delete_post(request, post_id):
+    if request.user != get_object_or_404(Post, id=post_id).author:
         return redirect(
             'blog:post_detail',
             post_id
         )
     if request.method == 'POST':
-        instance.delete()
+        get_object_or_404(Post, id=post_id).delete()
         return redirect(
             'blog:index'
         )
@@ -296,17 +262,13 @@ def delete_post(
         request,
         'blog/create.html',
         {
-            'form': form
+            'form': PostForm(instance=get_object_or_404(Post, id=post_id))
         }
     )
 
 
 @login_required
-def delete_comment(
-    request,
-    comment_id,
-    post_id
-):
+def delete_comment(request, comment_id, post_id):
     instance = get_object_or_404(
         Comment,
         id=comment_id
@@ -329,11 +291,7 @@ def delete_comment(
 
 
 @login_required
-def add_comment(
-    request,
-    post_id,
-    comment_id=None
-):
+def add_comment(request, post_id, comment_id=None):
     post = get_object_or_404(
         Post,
         id=post_id
@@ -359,15 +317,6 @@ def add_comment(
             return redirect(
                 'blog:post_detail',
                 post_id=post_id
-            )
-        else:
-            return render(
-                request,
-                'comments.html',
-                {
-                    'form': form,
-                    'post': post
-                }
             )
     else:
         form = CommentForm()
