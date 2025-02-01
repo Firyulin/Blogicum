@@ -49,8 +49,8 @@ def post_detail(request, post_id):
         ), id=post_id
     )
     if post.author != request.user and not (
-        post.pub_date <= timezone.now() and post.category.is_published and
-        post.is_published
+        post.pub_date <= timezone.now() and post.category.is_published
+        and post.is_published
     ):
         raise Http404('Пост не найден/доступен')
     return render(
