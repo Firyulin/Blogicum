@@ -21,17 +21,6 @@ def index(request):
         request,
         'blog/index.html',
         {
-            'post_list': Post.published_posts.select_related(
-                'author',
-                'location',
-                'category'
-            ).order_by(
-                '-pub_date'
-            ).annotate(
-                comment_count=Count(
-                    'comments'
-                )
-            ),
             'page_obj': get_paginator(
                 request,
                 Post.published_posts.select_related(
@@ -59,9 +48,10 @@ def post_detail(request, post_id):
             'author'
         ), id=post_id
     )
-    if post.author != request.user and not (post.pub_date <= timezone.now()
-                                            and post.category.is_published
-                                            and post.is_published):
+    if post.author != request.user and not (
+        post.pub_date <= timezone.now() and post.category.is_published and
+        post.is_published
+    ):
         raise Http404('Пост не найден/доступен')
     return render(
         request,
@@ -76,24 +66,20 @@ def post_detail(request, post_id):
 
 def category_posts(request, category_slug):
     """View функция категорий."""
+    category = get_object_or_404(
+        Category.objects.filter(
+            slug=category_slug
+        ),
+        is_published=True,
+    )
     return render(
         request,
         'blog/category.html',
         {
-            'category': get_object_or_404(
-                Category.objects.filter(
-                    slug=category_slug
-                ),
-                is_published=True,
-            ),
+            'category': category,
             'page_obj': get_paginator(
                 request,
-                get_object_or_404(
-                    Category.objects.filter(
-                        slug=category_slug
-                    ),
-                    is_published=True
-                ).posts(
+                category.posts(
                     manager='published_posts'
                 ).all()
             )
@@ -220,7 +206,7 @@ def edit_comment(request, post_id, comment_id):
         Comment,
         id=comment_id
     )
-    if request.user != Comment.objects.get(pk=comment_id).author:
+    if request.user != comment.author:
         return redirect(
             'blog:post_detail',
             post_id
@@ -248,13 +234,14 @@ def edit_comment(request, post_id, comment_id):
 
 @login_required
 def delete_post(request, post_id):
-    if request.user != get_object_or_404(Post, id=post_id).author:
+    post = get_object_or_404(Post, id=post_id)
+    if request.user != post.author:
         return redirect(
             'blog:post_detail',
             post_id
         )
     if request.method == 'POST':
-        get_object_or_404(Post, id=post_id).delete()
+        post.delete()
         return redirect(
             'blog:index'
         )
@@ -262,7 +249,7 @@ def delete_post(request, post_id):
         request,
         'blog/create.html',
         {
-            'form': PostForm(instance=get_object_or_404(Post, id=post_id))
+            'form': PostForm(instance=post)
         }
     )
 
@@ -301,7 +288,8 @@ def add_comment(request, post_id, comment_id=None):
             form = CommentForm(
                 instance=Comment.objects.get(
                     id=comment_id
-                ), data=request.POST
+                ),
+                data=request.POST
             )
         else:
             form = CommentForm(
